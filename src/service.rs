@@ -13,6 +13,9 @@
 // # Send custom control code 128 to reload the service
 // sc control MyService 128
 
+use named_pipe;
+use std::io::{BufReader, BufWriter, BufRead, Write};
+
 use std::ffi::OsString;
 use std::time::Duration;
 use windows_service::{
@@ -84,6 +87,15 @@ fn run_service() -> Result<(), windows_service::Error> {
         process_id: None,
     })?;
 
+    // Define named pipe
+    let pipename = "\\\\.\\pipe\\DirMon";
+    let server = named_pipe::PipeOptions::new(pipename)
+        .single().unwrap();
+    let mut pipe = server.wait().unwrap();
+    pipe.set_read_timeout(Some(Duration::from_secs(1)));
+    let mut reader = BufReader::new(pipe);
+    let mut s = String::new();
+
     // Main service loop
     loop {
         // Check if shutdown signal received
@@ -98,8 +110,11 @@ fn run_service() -> Result<(), windows_service::Error> {
                     // TODO: Reload configuration here
                     println!("Reloading configuration...");
                 }
-                
                 // TODO: Add your service logic here
+                reader.read_line( &mut s ).unwrap();
+                //Read Command
+
+                //Update 
             }
         }
     }
