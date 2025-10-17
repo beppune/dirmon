@@ -28,7 +28,6 @@ fn main() -> Result<()> {
     let (tx, rx) = mpsc::channel::<Result<Event>>();
 
     let mut watcher = notify::recommended_watcher(tx)?;
-    println!("{:?}", watcher);
 
     let path = Path::new(args[1].as_str());
     if !fs::metadata(path).unwrap().is_dir() {
@@ -38,33 +37,40 @@ fn main() -> Result<()> {
 
     watcher.watch(path, RecursiveMode::NonRecursive)?;
 
-    for res in rx {
-        match res {
-            Ok(event) => {
-                match event.kind {
-                    notify::EventKind::Create(_) => {
-                        let info = fs::metadata(event.paths[0].as_path())?;
-                        let ftype = if info.file_type().is_dir() {
-                            "DIR"
-                        } else {
-                            "FILE"
-                        };
-                        println!("Created {}: {}", ftype, event.paths[0].to_str().unwrap());
-                        let ss = format!("Created {}: {}\r\n", ftype, event.paths[0].to_str().unwrap());
-                        pipe.write_all(ss.as_bytes()).unwrap();
-                    },
-                    notify::EventKind::Remove(_) => {
-                        println!("Removed: {}",  event.paths[0].to_str().unwrap());
-                        let ss = format!("Removed: {}\r\n", event.paths[0].to_str().unwrap());
-                        pipe.write_all(ss.as_bytes()).unwrap();
-                    },
-                    _ => {},
+    let mut it = rx.try_iter();
+    loop {
+        if let Some(res) = it.next() {
+            match res {
+                Ok(event) => {
+                    match event.kind {
+                        notify::EventKind::Create(_) => {
+                            let info = fs::metadata(event.paths[0].as_path())?;
+                            let ftype = if info.file_type().is_dir() {
+                                "DIR"
+                            } else {
+                                "FILE"
+                            };
+                            println!("Created {}: {}", ftype, event.paths[0].to_str().unwrap());
+                            let ss = format!("Created {}: {}\r\n", ftype, event.paths[0].to_str().unwrap());
+                            pipe.write_all(ss.as_bytes()).unwrap();
+                        },
+                        notify::EventKind::Remove(_) => {
+                            println!("Removed: {}",  event.paths[0].to_str().unwrap());
+                            let ss = format!("Removed: {}\r\n", event.paths[0].to_str().unwrap());
+                            pipe.write_all(ss.as_bytes()).unwrap();
+                        },
+                        _ => {},
 
-                }
-            },
-            Err(error) => println!("{:?}", error),
+                    }
+                },
+                Err(error) => {
+                    println!("{:?}", error);
+                    break;
+                },
+            }
         }
     }
+
 
     Ok(())
 
