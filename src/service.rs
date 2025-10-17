@@ -110,9 +110,12 @@ fn run_service() -> Result<(), windows_service::Error> {
                     // TODO: Reload configuration here
                     println!("Reloading configuration...");
                 }
+
                 // TODO: Add your service logic here
                 reader.read_line( &mut s ).unwrap();
+                reader.get_mut().write_all( s.as_ref() ).unwrap();
                 //Read Command
+                
 
                 //Update 
             }

@@ -9,6 +9,7 @@ eframe = "0.33.0"
 egui = "0.33.0"
 egui-file-dialog = "0.12.0"
 named_pipe = "0.4.1"
+notify = "8.2.0"
 toml = "0.9.8"
 windows-service = "0.8.0"
 
@@ -19,4 +20,8 @@ path = "src/gui.rs"
 [[bin]]
 name = "service"
 path = "src/service.rs"
+
+[[bin]]
+name = "bgmon"
+path = "src/bgmon.rs"
 
