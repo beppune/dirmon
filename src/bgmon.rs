@@ -1,3 +1,5 @@
+mod config;
+
 use named_pipe;
 use notify::{Event, RecursiveMode, Result, Watcher};
 use std::{path::Path, sync::mpsc};
