@@ -6,6 +6,11 @@ use std::io::Write;
 
 const PIPE_NAME:&str = "\\\\.\\pipe\\DirMon";
 
+// To debug messages use this command in a console:
+//  winsocat STDIO NPIPE:DirMon
+//
+//  To install winsocat: winget install winsocat
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
@@ -14,10 +19,16 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
+    // Pipe
+    let mut pipe = named_pipe::PipeOptions::new(PIPE_NAME)
+        .single().unwrap().wait().unwrap();
+    println!("Pipe opened");
+
     // Watcher
     let (tx, rx) = mpsc::channel::<Result<Event>>();
 
     let mut watcher = notify::recommended_watcher(tx)?;
+    println!("{:?}", watcher);
 
     let path = Path::new(args[1].as_str());
     if !fs::metadata(path).unwrap().is_dir() {
@@ -39,11 +50,13 @@ fn main() -> Result<()> {
                             "FILE"
                         };
                         println!("Created {}: {}", ftype, event.paths[0].to_str().unwrap());
-                        // let ss = format!("Created {}: {}", ftype, event.paths[0].to_str().unwrap());
-                        // client.write_all(ss.as_bytes()).unwrap();
+                        let ss = format!("Created {}: {}\r\n", ftype, event.paths[0].to_str().unwrap());
+                        pipe.write_all(ss.as_bytes()).unwrap();
                     },
                     notify::EventKind::Remove(_) => {
                         println!("Removed: {}",  event.paths[0].to_str().unwrap());
+                        let ss = format!("Removed: {}\r\n", event.paths[0].to_str().unwrap());
+                        pipe.write_all(ss.as_bytes()).unwrap();
                     },
                     _ => {},
 
