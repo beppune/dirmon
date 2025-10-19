@@ -5,16 +5,16 @@ const DEFAULT_PATH:&'static str = ".\\dirmon.toml";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    pipe_name: String,
+    pub pipe_name: String,
 
     #[serde(flatten)]
-    dirconfs: HashMap<std::path::PathBuf, HashMap<String, String>>,
+    pub dirconfs: HashMap<std::path::PathBuf, HashMap<String, String>>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            pipe_name: String::from("DirMon"),
+            pipe_name: String::from("\\\\.\\pipe\\DirMon"),
             dirconfs: HashMap::new(),
         }
     }
