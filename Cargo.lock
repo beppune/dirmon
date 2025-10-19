@@ -706,6 +706,7 @@ dependencies = [
  "egui-file-dialog",
  "named_pipe",
  "notify",
+ "serde",
  "serde_toml",
  "toml",
  "windows-service",
