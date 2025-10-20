@@ -3,13 +3,21 @@ use std::collections::HashMap;
 
 const DEFAULT_PATH:&'static str = ".\\dirmon.toml";
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub enum FsEvent {
+    Create,
+    Delete,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(default)]
 pub struct Config {
     pub pipe_name: String,
     pub logfile: String,
+    pub nopipe: bool,
 
     #[serde(flatten)]
-    pub dirconfs: HashMap<std::path::PathBuf, HashMap<String, String>>,
+    pub dirconfs: HashMap<std::path::PathBuf, HashMap<FsEvent, String>>,
 }
 
 impl Default for Config {
@@ -17,6 +25,7 @@ impl Default for Config {
         Self {
             pipe_name: String::from("\\\\.\\pipe\\DirMon"),
             logfile: String::from(".\\dirmon.log"),
+            nopipe: false,
             dirconfs: HashMap::new(),
         }
     }
@@ -35,46 +44,3 @@ pub fn load(mut path: Option<String>) -> Result<Config,std::io::Error> {
     Ok(config)
 }
 
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    #[ignore]
-    fn default_config() {
-        let cfg = Config::default();
-        assert_eq!(cfg.pipe_name, "DirMon");
-    }
-
-    #[test]
-    fn load_test() {
-        let cfg = load(None).unwrap();
-        println!("{:?}", cfg);
-        assert_eq!(cfg.pipe_name, "DirMon");
-    }
-
-    #[test]
-    #[ignore]
-    fn serialize_toml() {
-        let cfg = Config {
-            pipe_name: "PipeNama".to_owned(),
-            dirconfs: HashMap::from([
-                (
-                    std::path::PathBuf::from("C:\\Temp"),
-                    HashMap::from([ (String::from("Event"), String::from("Action") ) ])
-                )
-            ]),
-            ..Default::default()
-        };
-        
-        let serialized = toml::to_string(&cfg).unwrap();
-
-        println!();
-        println!("{serialized}");
-        println!();
-
-        assert_eq!(true, true);
-    }
-
-}

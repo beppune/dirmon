@@ -2,13 +2,15 @@ mod config;
 
 use named_pipe::PipeServer;
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
-use std::sync::mpsc::Receiver;
+use std::{path::PathBuf, sync::mpsc::Receiver};
 use std::sync::mpsc;
 use std::fs::File;
 use std::fs;
 use std::io::Write;
 use log::{info, warn, error};
 use simplelog::*;
+use std::collections::HashMap;
+use config::FsEvent;
 
 type Rx = Receiver<Result<Event>>;
 
@@ -66,7 +68,7 @@ fn main() -> Result<()> {
                 Ok(event) => {
                     match event.kind {
                         notify::EventKind::Create(_) => run_create(event, &mut pipe),
-                        notify::EventKind::Remove(_) => run_remove(event, &mut pipe),
+                        notify::EventKind::Remove(_) => run_remove(&config.dirconfs, event, &mut pipe),
                         // notify::EventKind::Any => todo!(),
                         // notify::EventKind::Access(access_kind) => todo!(),
                         // notify::EventKind::Modify(modify_kind) => todo!(),
@@ -97,8 +99,13 @@ fn run_create(ev:Event, pipe: &mut PipeServer) {
     pipe.write_all(b"\n").unwrap();
 }
 
-fn run_remove(ev:Event, pipe: &mut PipeServer) {
-    let ss = format!("Removed: {}", ev.paths[0].to_str().unwrap());
+fn run_remove(dirconfs:&HashMap<PathBuf,HashMap<FsEvent,String>>, ev:Event, pipe: &mut PipeServer) {
+    let path = &ev.paths[0];
+    let parent = path.parent().unwrap();
+
+    dbg!( dirconfs.get(parent).unwrap().get(&FsEvent::Delete) );
+
+    let ss = format!("Removed: {}", path.to_str().unwrap());
     info!("{ss}");
     pipe.write_all(ss.as_bytes()).unwrap();
     pipe.write_all(b"\n").unwrap();
