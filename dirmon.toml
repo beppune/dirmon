@@ -1,7 +1,0 @@
-# This is an example configuration file
-#  copy and modify it as needed
-
-pipe_name = "DirMon"
-
-["C:\\Users\\manzo\\Sviluppo\\dirmon"]
-Create = "Action"

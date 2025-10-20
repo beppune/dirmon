@@ -6,6 +6,7 @@ const DEFAULT_PATH:&'static str = ".\\dirmon.toml";
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub pipe_name: String,
+    pub logfile: String,
 
     #[serde(flatten)]
     pub dirconfs: HashMap<std::path::PathBuf, HashMap<String, String>>,
@@ -15,6 +16,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             pipe_name: String::from("\\\\.\\pipe\\DirMon"),
+            logfile: String::from(".\\dirmon.log"),
             dirconfs: HashMap::new(),
         }
     }
@@ -63,6 +65,7 @@ mod test {
                     HashMap::from([ (String::from("Event"), String::from("Action") ) ])
                 )
             ]),
+            ..Default::default()
         };
         
         let serialized = toml::to_string(&cfg).unwrap();

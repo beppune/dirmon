@@ -4,30 +4,36 @@ use named_pipe::PipeServer;
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc;
+use std::fs::{*, File};
 use std::fs;
 use std::io::Write;
-
-// To debug messages use this command in a console:
-//  winsocat STDIO NPIPE:DirMon
-//
-//  To install winsocat: winget install winsocat
+use log::{info, warn};
+use simplelog::*;
 
 type Rx = Receiver<Result<Event>>;
+
 type WatchDir = (Rx,ReadDirectoryChangesWatcher);
 
 fn main() -> Result<()> {
-
     // CONFIGURATION
     // Read Config
     let config = config::load(None).unwrap();
     let pipe_name = format!("\\\\.\\pipe\\{}", config.pipe_name.clone());
+    //
+    // LOGGING
+    let _ = CombinedLogger::init(vec![
+        SimpleLogger::new(LevelFilter::Info, Config::default()),
+        WriteLogger::new(LevelFilter::Info, Config::default(), File::create(config.logfile.as_str()).unwrap()),
+    ]);
 
     // WATCHERS
     let mut watchers: Vec<WatchDir> = vec![];
 
     for key in config.dirconfs.keys() {
         if !key.is_dir() {
-            println!("The path \"{}\" is not a directory: skipping.", key.to_str().unwrap());
+            // println!("The path \"{}\" is not a directory: skipping.", key.to_str().unwrap());
+            let ss = key.to_str().unwrap();
+            warn!( "Not a directory [{ss}]: skipping." );
             continue;
         }
         let (tx, rx) = mpsc::channel::<Result<Event>>();
