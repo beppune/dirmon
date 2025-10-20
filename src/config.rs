@@ -22,8 +22,8 @@ impl Default for Config {
     }
 }
 
-pub fn load(mut path: Option<&'static str>) -> Result<Config,std::io::Error> {
-    path = path.or( Some(DEFAULT_PATH) );
+pub fn load(mut path: Option<String>) -> Result<Config,std::io::Error> {
+    path = path.or( Some(DEFAULT_PATH.to_string()) );
 
     let vec = std::fs::read(path.unwrap())?; 
     let strconf = str::from_utf8(vec.as_slice()).unwrap();

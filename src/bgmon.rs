@@ -15,9 +15,18 @@ type Rx = Receiver<Result<Event>>;
 type WatchDir = (Rx,ReadDirectoryChangesWatcher);
 
 fn main() -> Result<()> {
+
+    // ARGS
+    let mut args = pico_args::Arguments::from_env();
+    if args.contains(["-h", "--help"]) {
+        println!("\nbgmon [-c <config file> (default: .\\dirmon.toml)]\n");
+        std::process::exit(0);
+    }
+    let config_file:Option<String> = args.value_from_str("-c").ok();
+
     // CONFIGURATION
     // Read Config
-    let config = config::load(None).unwrap();
+    let config = config::load( config_file ).unwrap();
     let pipe_name = format!("\\\\.\\pipe\\{}", config.pipe_name.clone());
     //
     // LOGGING
