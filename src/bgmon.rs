@@ -4,10 +4,10 @@ use named_pipe::PipeServer;
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc;
-use std::fs::{*, File};
+use std::fs::File;
 use std::fs;
 use std::io::Write;
-use log::{info, warn};
+use log::{info, warn, error};
 use simplelog::*;
 
 type Rx = Receiver<Result<Event>>;
@@ -31,7 +31,6 @@ fn main() -> Result<()> {
 
     for key in config.dirconfs.keys() {
         if !key.is_dir() {
-            // println!("The path \"{}\" is not a directory: skipping.", key.to_str().unwrap());
             let ss = key.to_str().unwrap();
             warn!( "Not a directory [{ss}]: skipping." );
             continue;
@@ -43,9 +42,9 @@ fn main() -> Result<()> {
     }
 
     // PIPES
-    let mut pipe = named_pipe::PipeOptions::new(pipe_name)
+    let mut pipe = named_pipe::PipeOptions::new(&pipe_name)
         .single().unwrap().wait().unwrap();
-    println!("Pipe opened");
+    info!("Opened Pipe [{pipe_name}]");
 
     loop {
         for (rec, _) in &watchers {
@@ -67,7 +66,7 @@ fn main() -> Result<()> {
                     }
                 },
                 Err(error) => {
-                    println!("{:?}", error);
+                    error!("{error}");
                 },
             }
 
@@ -83,15 +82,17 @@ fn run_create(ev:Event, pipe: &mut PipeServer) {
     } else {
         "FILE"
     };
-    println!("Created {}: {}", ftype, ev.paths[0].to_str().unwrap());
-    let ss = format!("Created {}: {}\r\n", ftype, ev.paths[0].to_str().unwrap());
+    let ss = format!("Created {}: {}", ftype, ev.paths[0].to_str().unwrap());
+    info!("{ss}");
     pipe.write_all(ss.as_bytes()).unwrap();
+    pipe.write_all(b"\n").unwrap();
 }
 
 fn run_remove(ev:Event, pipe: &mut PipeServer) {
-    println!("Removed: {}",  ev.paths[0].to_str().unwrap());
-    let ss = format!("Removed: {}\r\n", ev.paths[0].to_str().unwrap());
+    let ss = format!("Removed: {}", ev.paths[0].to_str().unwrap());
+    info!("{ss}");
     pipe.write_all(ss.as_bytes()).unwrap();
+    pipe.write_all(b"\n").unwrap();
 }
 
 
