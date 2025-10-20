@@ -2,7 +2,6 @@
 name = "dirmon"
 version = "0.1.0"
 edition = "2024"
-default-run = "service"
 
 [dependencies]
 eframe = "0.33.0"
@@ -18,10 +17,6 @@ windows-service = "0.8.0"
 [[bin]]
 name = "gui"
 path = "src/gui.rs"
-
-[[bin]]
-name = "service"
-path = "src/service.rs"
 
 [[bin]]
 name = "bgmon"
