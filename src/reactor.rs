@@ -20,8 +20,7 @@ enum Handler {
     OnAccept(AcceptHandler),
     OnRead(ReadHandler),
     OnWrite(WriteHandler),
-    OnCreate(WatchHandler),
-    OnDelete(WatchHandler),
+    OnDir(WatchHandler),
 }
 
 pub enum Event {
@@ -31,25 +30,20 @@ pub enum Event {
     Write(Stream),
 
     //wacthers
-    DirmonCreate(String),
-    DirmonDelete(String),
+    Dirmon(String),
 }
 
 impl Event {
-    fn read(stream:Stream) -> Option<Event> {
+    pub fn read(stream:Stream) -> Option<Event> {
         Some( Event::Read(stream) )
     }
 
-    fn write(stream:Stream) -> Option<Event> {
+    pub fn write(stream:Stream) -> Option<Event> {
         Some( Event::Write(stream) )
     }
 
-    fn created(path:String) -> Option<Event> {
-        Some( Event::DirmonCreate(path) )
-    }
-
-    fn deleted(path:String) -> Option<Event> {
-        Some( Event::DirmonDelete(path) )
+    pub fn watch(path:String) -> Option<Event> {
+        Some( Event::Dirmon(path) )
     }
 }
 
@@ -61,7 +55,7 @@ pub struct Reactor {
 }
 
 impl Reactor {
-    fn new(listener: Listener) -> Self {
+    pub fn new(listener: Listener) -> Self {
         let q = Arc::new(RwLock::new(VecDeque::new()));
         Self {
             listener,
@@ -78,13 +72,13 @@ impl Reactor {
                             notify::EventKind::Create(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    q.write().unwrap().push_back( Event::DirmonCreate(path) ); 
+                                    q.write().unwrap().push_back( Event::Dirmon(path) ); 
                                 }
                             },
                             notify::EventKind::Remove(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    q.write().unwrap().push_back( Event::DirmonDelete(path) ); 
+                                    q.write().unwrap().push_back( Event::Dirmon(path) ); 
                                 }
                             },
                             _ => {},
@@ -96,7 +90,7 @@ impl Reactor {
         }
     }
 
-    fn run(&mut self) {
+    pub fn run(&mut self) {
 
         if self.handlers.is_empty() {
             return;
@@ -119,11 +113,11 @@ impl Reactor {
         }
     }
 
-    fn demux(&mut self) -> Option<Event> {
+    pub fn demux(&mut self) -> Option<Event> {
         self.queue.write().unwrap().pop_front()
     }
 
-    fn dispatch(&mut self, event:Event, buffer:&mut String) {
+    pub fn dispatch(&mut self, event:Event, buffer:&mut String) {
 
         match event {
             Event::Accept(stream) => {
@@ -179,37 +173,36 @@ impl Reactor {
                     }
                 }
             },
-            Event::DirmonCreate(_) => println!("create"),
-            Event::DirmonDelete(_) => println!("create"),
+            Event::Dirmon(_) => println!("create"),
         }
     }
 
-    fn accept<T>(&mut self, handler:T)
+    pub fn accept<T>(&mut self, handler:T)
         where T: Fn(Stream) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnAccept(Box::new(handler)) );
     }
 
-    fn read<T>(&mut self, handler:T)
+    pub fn read<T>(&mut self, handler:T)
         where T: Fn(Stream,usize) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnRead(Box::new(handler)) );
     }
 
-    fn write<T>(&mut self, handler:T)
+    pub fn write<T>(&mut self, handler:T)
         where T: Fn(Stream,usize) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnWrite(Box::new(handler)) );
     }
 
-    fn create<T>(&mut self, path:PathBuf, handler:T)
+    pub fn create<T>(&mut self, path:PathBuf, handler:T)
         where T: Fn(String) -> Option<Event> + 'static
     {
         self.watcher.watch(&path, notify::RecursiveMode::NonRecursive).unwrap();
         self.handlers.push( Handler::OnCreate(Box::new(handler)) );
     }
 
-    fn delete<T>(&mut self, path:PathBuf, handler:T)
+    pub fn delete<T>(&mut self, path:PathBuf, handler:T)
         where T: Fn(String) -> Option<Event> + 'static
     {
         self.watcher.watch(&path, notify::RecursiveMode::NonRecursive).unwrap();

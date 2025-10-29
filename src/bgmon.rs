@@ -1,7 +1,10 @@
 mod config;
+mod reactor;
 
+use interprocess::local_socket::{GenericNamespaced, ListenerNonblockingMode, ListenerOptions, ToNsName};
 use named_pipe::{ConnectingServer, PipeServer};
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
+use std::ffi::OsStr;
 use std::{path::PathBuf, sync::mpsc::Receiver};
 use std::sync::mpsc;
 use std::fs::File;
@@ -11,6 +14,7 @@ use log::{info, warn, error};
 use simplelog::*;
 use std::collections::HashMap;
 use config::FsEvent;
+use reactor::{Reactor, Event as REvent};
 
 type Rx = Receiver<Result<Event>>;
 
@@ -48,8 +52,17 @@ fn main() -> Result<()> {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create(config.logfile.as_str()).unwrap()),
     ]);
 
-    // WATCHERS
+
+    // WATCHER
     let mut watchers: Vec<WatchDir> = vec![];
+
+    // PIPE
+    //
+    let listener = ListenerOptions::new()
+        .nonblocking(ListenerNonblockingMode::Stream)
+        .name( OsStr::new("ThePipe").to_ns_name::<GenericNamespaced>().unwrap() )
+        .create_sync().unwrap();
+    let mut reactor = Reactor::new(listener);
 
     for key in config.dirconfs.keys() {
         if !key.is_dir() {
@@ -57,24 +70,19 @@ fn main() -> Result<()> {
             warn!( "Not a directory [{ss}]: skipping." );
             continue;
         }
-        let (tx, rx) = mpsc::channel::<Result<Event>>();
-        let mut w = notify::recommended_watcher(tx)?;
-        w.watch( key, RecursiveMode::NonRecursive )?;
-        watchers.push( (rx, w) );
+
+        reactor.create(key.to_path_buf(), |p|{
+            info!("CREATED {p}");
+            None
+        });
+
+        reactor.delete(key.to_path_buf(), |p|{
+            info!("DELETED {p}");
+            None
+        });
+
     }
 
-    // PIPE
-    let pipe_server:ConnectingServer;
-    let mut pipe:Option<PipeServer> = None;
-
-    if !config.nopipe {
-        pipe_server = named_pipe::PipeOptions::new(&pipe_name)
-            .single().unwrap() ;
-        pipe = Some( pipe_server.wait().unwrap() );
-        info!("Opened Pipe [{pipe_name}]");
-    } else {
-        info!("Pipe is disabled [--nopipe, see help]")
-    }
 
     info!("Watching directories.");
     loop {
