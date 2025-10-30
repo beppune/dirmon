@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use interprocess::local_socket::{Listener, *};
 use interprocess::local_socket::traits::Listener as Listen;
@@ -97,17 +98,23 @@ impl Reactor {
             return;
         }
 
-        match self.listener.accept() {
-            Ok(stream) => { 
-                {
-                    self.queue.write().unwrap()
-                        .push_back( Event::Accept(stream) );
-                    }
-            },
-            Err(err) if err.kind() == ErrorKind::WouldBlock => {},
-            Err(err) => {
-                println!("{err}");
-            },
+        loop {
+            match self.listener.accept() {
+                Ok(stream) => { 
+                    {
+                        self.queue.write().unwrap()
+                            .push_back( Event::Accept(stream) );
+                        }
+                    break;
+                },
+                Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(100));
+                },
+                Err(err) => {
+                    println!("{err}");
+                    break;
+                },
+            }
         }
     }
 
@@ -139,7 +146,8 @@ impl Reactor {
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
                             ev = Event::read(stream, buffer);
                         },
-                        Err(_) => {
+                        Err(err) => {
+                            println!("{err}");
                             ev = None;
                         }
                     }
@@ -161,7 +169,8 @@ impl Reactor {
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
                             ev = Event::write(stream, buffer);
                         },
-                        Err(_) => {
+                        Err(err) => {
+                            println!("{err}");
                             ev = None;
                         },
                     }

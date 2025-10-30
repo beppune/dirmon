@@ -56,7 +56,7 @@ fn main() {
     // PIPE
     //
     let listener = ListenerOptions::new()
-        .nonblocking(ListenerNonblockingMode::Stream)
+        .nonblocking(ListenerNonblockingMode::Both)
         .name( OsStr::new( config.pipe_name.as_str() ).to_ns_name::<GenericNamespaced>().unwrap() )
         .create_sync().unwrap();
     let mut reactor = Reactor::new(listener);
@@ -74,8 +74,6 @@ fn main() {
         });
 
     }
-
-    // let proto = Rc::new(RefCell::new(String::new()));
 
     {
         reactor.accept(move |stream| {
