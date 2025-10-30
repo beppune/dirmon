@@ -75,34 +75,32 @@ fn main() {
 
     }
 
-    let proto = Rc::new(RefCell::new(String::new()));
+    // let proto = Rc::new(RefCell::new(String::new()));
 
     {
         reactor.accept(move |stream| {
-            REvent::read(stream, String::new())
+            REvent::write(stream, String::from("SERVICE: Ready\r\n"))
         });
     }
 
     {
-        let proto = Rc::clone(&proto);
-        reactor.read(move |stream, mut buffer| {
+        reactor.read(move |stream, buffer| {
             REvent::write(stream, buffer)
         });
     }
 
     {
-        let proto = Rc::clone(&proto);
-        reactor.write(move |stream, mut buffer| {
+        reactor.write(move |stream, buffer| {
             REvent::read(stream, buffer)
         });
     }
 
     reactor.run();
-    info!("Watching directories.");
+    info!("SERVICE: Watching directories.");
 
     while let Some(event) = reactor.demux() {
         reactor.dispatch(event);
     }
-    info!("Queue ended!");
+    info!("SERVICE: End queue!");
 }
 
