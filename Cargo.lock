@@ -715,7 +715,6 @@ dependencies = [
  "egui-file-dialog",
  "interprocess",
  "log",
- "named_pipe",
  "notify",
  "pico-args",
  "serde",
@@ -1854,15 +1853,6 @@ dependencies = [
  "spirv",
  "thiserror 2.0.17",
  "unicode-ident",
-]
-
-[[package]]
-name = "named_pipe"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad9c443cce91fc3e12f017290db75dde490d685cdaaf508d7159d7cf41f0eb2b"
-dependencies = [
- "winapi",
 ]
 
 [[package]]

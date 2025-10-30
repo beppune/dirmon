@@ -12,8 +12,8 @@ use notify::Watcher;
 use std::io::Read;
 
 type AcceptHandler = Box<dyn Fn(Stream) -> Option<Event>>;
-type ReadHandler = Box<dyn Fn(Stream,usize) -> Option<Event>>;
-type WriteHandler = Box<dyn Fn(Stream,usize) -> Option<Event>>;
+type ReadHandler = Box<dyn Fn(Stream,String) -> Option<Event>>;
+type WriteHandler = Box<dyn Fn(Stream,String) -> Option<Event>>;
 type WatchHandler = Box<dyn Fn(String) -> Option<Event>>;
 
 enum Handler {
@@ -26,20 +26,20 @@ enum Handler {
 pub enum Event {
     //pipes
     Accept(Stream),
-    Read(Stream),
-    Write(Stream),
+    Read(Stream,String),
+    Write(Stream,String),
 
     //wacthers
     Dirmon(String),
 }
 
 impl Event {
-    pub fn read(stream:Stream) -> Option<Event> {
-        Some( Event::Read(stream) )
+    pub fn read(stream:Stream, buffer:String) -> Option<Event> {
+        Some( Event::Read(stream, buffer) )
     }
 
-    pub fn write(stream:Stream) -> Option<Event> {
-        Some( Event::Write(stream) )
+    pub fn write(stream:Stream, buffer:String) -> Option<Event> {
+        Some( Event::Write(stream, buffer) )
     }
 
     pub fn watch(path:String) -> Option<Event> {
@@ -64,8 +64,9 @@ impl Reactor {
             watcher: notify::recommended_watcher(move |res:notify::Result<notify::Event>| {
                 match res {
                     Ok(event) => {
+                        println!("dir event");
                         match event.kind {
-                            // notify::EventKind::Any => todo!(),
+                            notify::EventKind::Any => println!("any"),
                             // notify::EventKind::Access(access_kind) => todo!(),
                             // notify::EventKind::Modify(modify_kind) => todo!(),
                             // notify::EventKind::Other => todo!(),
@@ -117,7 +118,7 @@ impl Reactor {
         self.queue.write().unwrap().pop_front()
     }
 
-    pub fn dispatch(&mut self, event:Event, buffer:&mut String) {
+    pub fn dispatch(&mut self, event:Event) {
 
         match event {
             Event::Accept(stream) => {
@@ -127,20 +128,20 @@ impl Reactor {
                     }
                 }
             },
-            Event::Read(mut stream) => {
+            Event::Read(mut stream, mut buffer) => {
                 if let Some(Handler::OnRead(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnRead(_)) ) {
                     let ev:Option<Event>;
                     buffer.clear();
-                    match stream.read_to_string(buffer) {
+                    match stream.read_to_string(&mut buffer) {
                         Ok(amount) if amount == 0 => {
-                            ev = Event::read(stream);
+                            ev = Event::read(stream, buffer);
                         },
-                        Ok(amount) => {
+                        Ok(_amount) => {
                             print!("In dispatcher: {buffer}");
-                            ev = callback(stream, amount);
+                            ev = callback(stream, buffer);
                         },
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                            ev = Event::read(stream);
+                            ev = Event::read(stream, buffer);
                         },
                         Err(_) => {
                             ev = None;
@@ -151,18 +152,18 @@ impl Reactor {
                     }
                 }
             },
-            Event::Write(mut stream) => {
+            Event::Write(mut stream, buffer) => {
                 if let Some(Handler::OnWrite(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnWrite(_)) ) {
                     let ev:Option<Event>;
                     match stream.write(buffer.as_bytes()) {
                         Ok(amount) if amount == 0 => {
-                            ev = Event::write(stream);
+                            ev = Event::write(stream, buffer);
                         },
-                        Ok(amount) => {
-                            ev = callback(stream, amount);
+                        Ok(_amount) => {
+                            ev = callback(stream, buffer);
                         },
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                            ev = Event::write(stream);
+                            ev = Event::write(stream, buffer);
                         },
                         Err(_) => {
                             ev = None;
@@ -173,7 +174,14 @@ impl Reactor {
                     }
                 }
             },
-            Event::Dirmon(_) => println!("create"),
+            Event::Dirmon(path) => {
+                if let Some(Handler::OnDir(callback)) = &self.handlers.iter().find(|h| matches!(h, Handler::OnDir(_)) ) {
+                    let opt_ev = callback(path);
+                    if let Some(ev) = opt_ev {
+                        self.queue.write().unwrap().push_back( ev );
+                    }
+                }
+            },
         }
     }
 
@@ -184,28 +192,22 @@ impl Reactor {
     }
 
     pub fn read<T>(&mut self, handler:T)
-        where T: Fn(Stream,usize) -> Option<Event> + 'static
+        where T: Fn(Stream,String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnRead(Box::new(handler)) );
     }
 
     pub fn write<T>(&mut self, handler:T)
-        where T: Fn(Stream,usize) -> Option<Event> + 'static
+        where T: Fn(Stream,String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnWrite(Box::new(handler)) );
     }
 
-    pub fn create<T>(&mut self, path:PathBuf, handler:T)
+    pub fn watch<T>(&mut self, path:PathBuf, handler:T)
         where T: Fn(String) -> Option<Event> + 'static
     {
         self.watcher.watch(&path, notify::RecursiveMode::NonRecursive).unwrap();
-        self.handlers.push( Handler::OnCreate(Box::new(handler)) );
-    }
-
-    pub fn delete<T>(&mut self, path:PathBuf, handler:T)
-        where T: Fn(String) -> Option<Event> + 'static
-    {
-        self.watcher.watch(&path, notify::RecursiveMode::NonRecursive).unwrap();
-        self.handlers.push( Handler::OnDelete(Box::new(handler)) );
+        self.handlers.push( Handler::OnDir(Box::new(handler)) );
     }
 }
+

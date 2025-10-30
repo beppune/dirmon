@@ -2,7 +2,6 @@ mod config;
 mod reactor;
 
 use interprocess::local_socket::{GenericNamespaced, ListenerNonblockingMode, ListenerOptions, ToNsName};
-use named_pipe::{ConnectingServer, PipeServer};
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
 use std::ffi::OsStr;
 use std::{path::PathBuf, sync::mpsc::Receiver};
@@ -20,7 +19,7 @@ type Rx = Receiver<Result<Event>>;
 
 type WatchDir = (Rx,ReadDirectoryChangesWatcher);
 
-fn main() -> Result<()> {
+fn main() {
 
     // ARGS
     let mut args = pico_args::Arguments::from_env();
@@ -39,7 +38,6 @@ fn main() -> Result<()> {
     // CONFIGURATION
     // Read Config
     let mut config = config::load( config_file ).unwrap();
-    let pipe_name = format!("\\\\.\\pipe\\{}", config.pipe_name.clone());
 
     // Override options
     if args.contains(["-n", "--nopipe"]) {
@@ -53,14 +51,11 @@ fn main() -> Result<()> {
     ]);
 
 
-    // WATCHER
-    let mut watchers: Vec<WatchDir> = vec![];
-
     // PIPE
     //
     let listener = ListenerOptions::new()
         .nonblocking(ListenerNonblockingMode::Stream)
-        .name( OsStr::new("ThePipe").to_ns_name::<GenericNamespaced>().unwrap() )
+        .name( OsStr::new( config.pipe_name.as_str() ).to_ns_name::<GenericNamespaced>().unwrap() )
         .create_sync().unwrap();
     let mut reactor = Reactor::new(listener);
 
@@ -71,78 +66,33 @@ fn main() -> Result<()> {
             continue;
         }
 
-        reactor.create(key.to_path_buf(), |p|{
-            info!("CREATED {p}");
-            None
-        });
-
-        reactor.delete(key.to_path_buf(), |p|{
-            info!("DELETED {p}");
+        reactor.watch(key.to_path_buf(), |p|{
+            info!("{p}");
             None
         });
 
     }
 
+    reactor.accept(|stream|{
+        REvent::read(stream, String::new())
+    });
+
+    reactor.read(|stream, buffer| {
+        println!("Reading {buffer}");
+        REvent::write(stream, buffer)
+    });
+
+    reactor.write(|stream, buffer| {
+        println!("Writing {buffer}");
+        REvent::read(stream, buffer)
+    });
 
     info!("Watching directories.");
-    loop {
-        for (rec, _) in &watchers {
-            let tryrecv = rec.try_recv();
-            if tryrecv.is_err() {
-                continue;
-            }
 
-            match tryrecv.unwrap() {
-                Ok(event) => {
-                    match event.kind {
-                        notify::EventKind::Create(_) => run_create(event, pipe.as_mut()),
-                        notify::EventKind::Remove(_) => run_remove(&config.dirconfs, event, pipe.as_mut()),
-                        // notify::EventKind::Any => todo!(),
-                        // notify::EventKind::Access(access_kind) => todo!(),
-                        // notify::EventKind::Modify(modify_kind) => todo!(),
-                        // notify::EventKind::Other => todo!(),
-                        _ => {},
-                    }
-                },
-                Err(error) => {
-                    error!("{error}");
-                },
-            }
+    reactor.run();
 
-        }
-    }
-
-}
-
-fn run_create(ev:Event, pipe: Option<&mut PipeServer>) {
-    let info = fs::metadata(ev.paths[0].as_path()).unwrap();
-    let ftype = if info.file_type().is_dir() {
-        "DIR"
-    } else {
-        "FILE"
-    };
-    let ss = format!("Created {}: {}", ftype, ev.paths[0].to_str().unwrap());
-    info!("{ss}");
-
-    if let Some(p) = pipe {
-        p.write_all(ss.as_bytes()).unwrap();
-        p.write_all(b"\n").unwrap();
+    while let Some(event) = reactor.demux() {
+        reactor.dispatch(event);
     }
 }
-
-fn run_remove(dirconfs:&HashMap<PathBuf,HashMap<FsEvent,String>>, ev:Event, pipe: Option<&mut PipeServer>) {
-    let path = &ev.paths[0];
-    let parent = path.parent().unwrap();
-
-    dbg!( dirconfs.get(parent).unwrap().get(&FsEvent::Delete) );
-
-    let ss = format!("Removed: {}", path.to_str().unwrap());
-    info!("{ss}");
-    
-    if let Some(p) = pipe {
-        p.write_all(ss.as_bytes()).unwrap();
-        p.write_all(b"\n").unwrap();
-    }
-}
-
 
