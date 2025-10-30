@@ -3,7 +3,9 @@ mod reactor;
 
 use interprocess::local_socket::{GenericNamespaced, ListenerNonblockingMode, ListenerOptions, ToNsName};
 use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
+use std::cell::RefCell;
 use std::ffi::OsStr;
+use std::rc::Rc;
 use std::{path::PathBuf, sync::mpsc::Receiver};
 use std::sync::mpsc;
 use std::fs::File;
@@ -30,7 +32,7 @@ fn main() {
      Other options:
          -h, --help:     Show this help
          -n, --nopipe:   No pipe will be used
-"#);
+         "#);
         std::process::exit(0);
     }
     let config_file:Option<String> = args.value_from_str("-c").ok();
@@ -73,26 +75,34 @@ fn main() {
 
     }
 
-    reactor.accept(|stream|{
-        REvent::read(stream, String::new())
-    });
+    let proto = Rc::new(RefCell::new(String::new()));
 
-    reactor.read(|stream, buffer| {
-        println!("Reading {buffer}");
-        REvent::write(stream, buffer)
-    });
+    {
+        reactor.accept(move |stream| {
+            REvent::read(stream, String::new())
+        });
+    }
 
-    reactor.write(|stream, buffer| {
-        println!("Writing {buffer}");
-        REvent::read(stream, buffer)
-    });
+    {
+        let proto = Rc::clone(&proto);
+        reactor.read(move |stream, mut buffer| {
+            REvent::write(stream, buffer)
+        });
+    }
 
-    info!("Watching directories.");
+    {
+        let proto = Rc::clone(&proto);
+        reactor.write(move |stream, mut buffer| {
+            REvent::read(stream, buffer)
+        });
+    }
 
     reactor.run();
+    info!("Watching directories.");
 
     while let Some(event) = reactor.demux() {
         reactor.dispatch(event);
     }
+    info!("Queue ended!");
 }
 

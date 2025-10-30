@@ -23,6 +23,7 @@ enum Handler {
     OnDir(WatchHandler),
 }
 
+#[derive(Debug)]
 pub enum Event {
     //pipes
     Accept(Stream),
@@ -64,9 +65,8 @@ impl Reactor {
             watcher: notify::recommended_watcher(move |res:notify::Result<notify::Event>| {
                 match res {
                     Ok(event) => {
-                        println!("dir event");
                         match event.kind {
-                            notify::EventKind::Any => println!("any"),
+                            // notify::EventKind::Any => println!("any"),
                             // notify::EventKind::Access(access_kind) => todo!(),
                             // notify::EventKind::Modify(modify_kind) => todo!(),
                             // notify::EventKind::Other => todo!(),
@@ -97,20 +97,17 @@ impl Reactor {
             return;
         }
 
-        loop {
-            match self.listener.accept() {
-                Ok(stream) => { 
-                    {
-                        self.queue.write().unwrap()
-                            .push_back( Event::Accept(stream) );
+        match self.listener.accept() {
+            Ok(stream) => { 
+                {
+                    self.queue.write().unwrap()
+                        .push_back( Event::Accept(stream) );
                     }
-                    break;
-                },
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {},
-                Err(err) => {
-                    println!("{err}");
-                },
-            }
+            },
+            Err(err) if err.kind() == ErrorKind::WouldBlock => {},
+            Err(err) => {
+                println!("{err}");
+            },
         }
     }
 
@@ -137,7 +134,6 @@ impl Reactor {
                             ev = Event::read(stream, buffer);
                         },
                         Ok(_amount) => {
-                            print!("In dispatcher: {buffer}");
                             ev = callback(stream, buffer);
                         },
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
