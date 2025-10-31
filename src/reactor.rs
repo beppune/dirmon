@@ -12,9 +12,9 @@ use notify::Watcher;
 
 use std::io::Read;
 
-type AcceptHandler = Box<dyn Fn(Stream) -> Option<Event>>;
-type ReadHandler = Box<dyn Fn(Stream,String) -> Option<Event>>;
-type WriteHandler = Box<dyn Fn(Stream,String) -> Option<Event>>;
+type AcceptHandler = Box<dyn Fn() -> Option<Event>>;
+type ReadHandler = Box<dyn Fn(String) -> Option<Event>>;
+type WriteHandler = Box<dyn Fn(String) -> Option<Event>>;
 type WatchHandler = Box<dyn Fn(String) -> Option<Event>>;
 
 enum Handler {
@@ -27,9 +27,9 @@ enum Handler {
 #[derive(Debug)]
 pub enum Event {
     //pipes
-    Accept(Stream),
-    Read(Stream,String),
-    Write(Stream,String),
+    Accept,
+    Read(String),
+    Write(String),
 
     //wacthers
     Dirmon(String),
@@ -39,12 +39,12 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn read(stream:Stream, buffer:String) -> Option<Event> {
-        Some( Event::Read(stream, buffer) )
+    pub fn read(buffer:String) -> Option<Event> {
+        Some( Event::Read(buffer) )
     }
 
-    pub fn write(stream:Stream, buffer:String) -> Option<Event> {
-        Some( Event::Write(stream, buffer) )
+    pub fn write(buffer:String) -> Option<Event> {
+        Some( Event::Write(buffer) )
     }
 
     // pub fn watch(path:String) -> Option<Event> {
@@ -56,6 +56,7 @@ pub struct Reactor {
     listener: Listener,
     queue: Arc<RwLock<VecDeque<Event>>>,
     handlers: Vec<Handler>,
+    stream: std::cell::OnceCell<Stream>,
     watcher: notify::RecommendedWatcher,
 }
 
@@ -66,6 +67,7 @@ impl Reactor {
             listener,
             queue: q.clone(),
             handlers: vec![],
+            stream: std::cell::OnceCell::new(),
             watcher: notify::recommended_watcher(move |res:notify::Result<notify::Event>| {
                 match res {
                     Ok(event) => {
@@ -107,8 +109,9 @@ impl Reactor {
             match self.listener.accept() {
                 Ok(stream) => { 
                     {
+                        self.stream.set( stream );
                         self.queue.write().unwrap()
-                            .push_back( Event::Accept(stream) );
+                            .push_back( Event::Accept );
                         }
                     break;
                 },
@@ -130,26 +133,26 @@ impl Reactor {
     pub fn dispatch(&mut self, event:Event) {
 
         match event {
-            Event::Accept(stream) => {
+            Event::Accept => {
                 if let Some(Handler::OnAccept(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnAccept(_)) ) {
-                    if let Some(ev) = callback(stream) {   
+                    if let Some(ev) = callback() {   
                         self.queue.write().unwrap().push_back( ev ); 
                     }
                 }
             },
-            Event::Read(mut stream, mut buffer) => {
+            Event::Read(mut buffer) => {
                 if let Some(Handler::OnRead(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnRead(_)) ) {
                     let ev:Option<Event>;
                     buffer.clear();
-                    match stream.read_to_string(&mut buffer) {
+                    match self.stream.get_mut().unwrap().read_to_string(&mut buffer) {
                         Ok(amount) if amount == 0 => {
-                            ev = Event::read(stream, buffer);
+                            ev = Event::read(buffer);
                         },
                         Ok(_amount) => {
-                            ev = callback(stream, buffer);
+                            ev = callback(buffer);
                         },
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                            ev = Event::read(stream, buffer);
+                            ev = Event::read(buffer);
                         },
                         Err(err) => {
                             println!("{err}");
@@ -161,18 +164,18 @@ impl Reactor {
                     }
                 }
             },
-            Event::Write(mut stream, buffer) => {
+            Event::Write(buffer) => {
                 if let Some(Handler::OnWrite(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnWrite(_)) ) {
                     let ev:Option<Event>;
-                    match stream.write(buffer.as_bytes()) {
+                    match self.stream.get_mut().unwrap().write(buffer.as_bytes()) {
                         Ok(amount) if amount == 0 => {
-                            ev = Event::write(stream, buffer);
+                            ev = Event::write(buffer);
                         },
                         Ok(_amount) => {
-                            ev = callback(stream, buffer);
+                            ev = callback(buffer);
                         },
                         Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                            ev = Event::write(stream, buffer);
+                            ev = Event::write(buffer);
                         },
                         Err(err) => {
                             println!("{err}");
@@ -186,8 +189,10 @@ impl Reactor {
             },
             Event::Dirmon(path) => {
                 if let Some(Handler::OnDir(callback)) = &self.handlers.iter().find(|h| matches!(h, Handler::OnDir(_)) ) {
+                    let p = path.clone();
                     let opt_ev = callback(path);
                     if let Some(ev) = opt_ev {
+                        self.queue.write().unwrap().push_back( Event::Write(p.clone()) );
                         self.queue.write().unwrap().push_back( ev );
                     }
                 }
@@ -200,19 +205,19 @@ impl Reactor {
     }
 
     pub fn accept<T>(&mut self, handler:T)
-        where T: Fn(Stream) -> Option<Event> + 'static
+        where T: Fn() -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnAccept(Box::new(handler)) );
     }
 
     pub fn read<T>(&mut self, handler:T)
-        where T: Fn(Stream,String) -> Option<Event> + 'static
+        where T: Fn(String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnRead(Box::new(handler)) );
     }
 
     pub fn write<T>(&mut self, handler:T)
-        where T: Fn(Stream,String) -> Option<Event> + 'static
+        where T: Fn(String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnWrite(Box::new(handler)) );
     }
