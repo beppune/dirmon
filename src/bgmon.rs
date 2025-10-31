@@ -1,5 +1,6 @@
 mod config;
 mod reactor;
+mod command;
 
 use interprocess::local_socket::{GenericNamespaced, ListenerNonblockingMode, ListenerOptions, ToNsName};
 use std::ffi::OsStr;
@@ -70,12 +71,11 @@ fn main() {
 
     {
         reactor.read(move |stream, buffer| {
-            let ev = if buffer.contains("QUIT") {
-                Some(REvent::Quit)
-            } else {
-                REvent::write(stream, buffer)
+            let opt_ev:Option<REvent> = match command::parse_command(&buffer) {
+                Ok(event) => Some(event),
+                Err(_) => REvent::write(stream, buffer),
             };
-            ev            
+            opt_ev
         });
     }
 
