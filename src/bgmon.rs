@@ -2,24 +2,11 @@ mod config;
 mod reactor;
 
 use interprocess::local_socket::{GenericNamespaced, ListenerNonblockingMode, ListenerOptions, ToNsName};
-use notify::{Event, ReadDirectoryChangesWatcher, RecursiveMode, Result, Watcher};
-use std::cell::RefCell;
 use std::ffi::OsStr;
-use std::rc::Rc;
-use std::{path::PathBuf, sync::mpsc::Receiver};
-use std::sync::mpsc;
 use std::fs::File;
-use std::fs;
-use std::io::Write;
-use log::{info, warn, error};
+use log::{info, warn};
 use simplelog::*;
-use std::collections::HashMap;
-use config::FsEvent;
 use reactor::{Reactor, Event as REvent};
-
-type Rx = Receiver<Result<Event>>;
-
-type WatchDir = (Rx,ReadDirectoryChangesWatcher);
 
 fn main() {
 
@@ -93,8 +80,8 @@ fn main() {
         });
     }
 
-    reactor.run();
     info!("SERVICE: Watching directories.");
+    reactor.run();
 
     while let Some(event) = reactor.demux() {
         reactor.dispatch(event);

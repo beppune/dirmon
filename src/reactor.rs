@@ -1,13 +1,13 @@
 
 use std::collections::VecDeque;
-use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use interprocess::local_socket::{Listener, *};
 use interprocess::local_socket::traits::Listener as Listen;
+use log::info;
 use notify::Watcher;
 
 use std::io::Read;
@@ -44,9 +44,9 @@ impl Event {
         Some( Event::Write(stream, buffer) )
     }
 
-    pub fn watch(path:String) -> Option<Event> {
-        Some( Event::Dirmon(path) )
-    }
+    // pub fn watch(path:String) -> Option<Event> {
+    //     Some( Event::Dirmon(path) )
+    // }
 }
 
 pub struct Reactor {
@@ -74,12 +74,14 @@ impl Reactor {
                             notify::EventKind::Create(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
+                                    info!("CREATED {path}");
                                     q.write().unwrap().push_back( Event::Dirmon(path) ); 
                                 }
                             },
                             notify::EventKind::Remove(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
+                                    info!("REMOVED: {path}");
                                     q.write().unwrap().push_back( Event::Dirmon(path) ); 
                                 }
                             },
