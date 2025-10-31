@@ -70,7 +70,12 @@ fn main() {
 
     {
         reactor.read(move |stream, buffer| {
-            REvent::write(stream, buffer)
+            let ev = if buffer.contains("QUIT") {
+                Some(REvent::Quit)
+            } else {
+                REvent::write(stream, buffer)
+            };
+            ev            
         });
     }
 

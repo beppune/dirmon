@@ -33,6 +33,9 @@ pub enum Event {
 
     //wacthers
     Dirmon(String),
+
+    //management
+    Quit,
 }
 
 impl Event {
@@ -188,6 +191,10 @@ impl Reactor {
                         self.queue.write().unwrap().push_back( ev );
                     }
                 }
+            },
+            Event::Quit => {
+                info!("SERVICE: Quitting.");
+                std::process::exit(0);
             },
         }
     }
