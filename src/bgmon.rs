@@ -64,24 +64,24 @@ fn main() {
     }
 
     {
-        reactor.accept(move |stream| {
-            REvent::write(stream, String::from("SERVICE: Ready\r\n"))
+        reactor.accept(|| {
+            REvent::write(String::from("SERVICE: Ready\r\n"))
         });
     }
 
     {
-        reactor.read(move |stream, buffer| {
+        reactor.read(|buffer| {
             let opt_ev:Option<REvent> = match command::parse_command(&buffer) {
                 Ok(event) => Some(event),
-                Err(_) => REvent::write(stream, buffer),
+                Err(_) => REvent::write(buffer),
             };
             opt_ev
         });
     }
 
     {
-        reactor.write(move |stream, buffer| {
-            REvent::read(stream, buffer)
+        reactor.write(|buffer| {
+            REvent::read(buffer)
         });
     }
 

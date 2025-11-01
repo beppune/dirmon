@@ -109,7 +109,7 @@ impl Reactor {
             match self.listener.accept() {
                 Ok(stream) => { 
                     {
-                        self.stream.set( stream );
+                        self.stream.set( stream ).unwrap();
                         self.queue.write().unwrap()
                             .push_back( Event::Accept );
                         }
