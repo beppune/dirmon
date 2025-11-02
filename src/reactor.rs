@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use interprocess::local_socket::{Listener, *};
 use interprocess::local_socket::traits::Listener as Listen;
-use log::info;
+use log::{info, error};
 use notify::Watcher;
 
 use std::io::Read;
@@ -101,24 +101,8 @@ impl Reactor {
             return;
         }
 
-        loop {
-            match self.listener.accept() {
-                Ok(stream) => { 
-                    {
-                        self.stream.set( stream ).unwrap();
-                        self.queue.write().unwrap()
-                            .push_back( Event::Accept );
-                        }
-                    break;
-                },
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                    std::thread::sleep(Duration::from_millis(100));
-                },
-                Err(err) => {
-                    println!("{err}");
-                    break;
-                },
-            }
+        {
+            self.queue.write().unwrap().push_back( Event::Accept );
         }
     }
 
@@ -131,8 +115,20 @@ impl Reactor {
         match event {
             Event::Accept => {
                 if let Some(Handler::OnAccept(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnAccept(_)) ) {
-                    if let Some(ev) = callback() {   
-                        self.queue.write().unwrap().push_back( ev ); 
+                    match self.listener.accept() {
+                        Ok(stream) => {
+                            self.stream.set( stream ).unwrap();
+                            if let Some(ev) = callback() {   
+                                self.queue.write().unwrap().push_back( ev ); 
+                            }
+                        },
+                        Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                            self.queue.write().unwrap().push_back( Event::Accept );
+                        },
+                        Err(err) => {
+                            error!("{err}"); 
+                            self.queue.write().unwrap().push_back( Event::Accept );
+                        },
                     }
                 }
             },

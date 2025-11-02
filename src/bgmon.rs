@@ -43,7 +43,7 @@ fn main() {
 
     // EXIT
     ctrlc::set_handler(|| {
-        info!("SERVICE: graceful shutdown!");
+        info!("SERVICE: graceful shutdown");
         std::process::exit(0);
     }).unwrap();
 
@@ -74,6 +74,7 @@ fn main() {
 
     {
         reactor.on_accept(|| {
+            info!("Pipe connected");
             REvent::write(String::from("SERVICE: Ready\r\n"))
         });
     }
