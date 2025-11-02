@@ -8,6 +8,7 @@ use std::fs::File;
 use log::{info, warn};
 use simplelog::*;
 use reactor::{Reactor, Event as REvent};
+use ctrlc;
 
 fn main() {
 
@@ -40,6 +41,11 @@ fn main() {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create(config.logfile.as_str()).unwrap()),
     ]);
 
+    // EXIT
+    ctrlc::set_handler(|| {
+        info!("SERVICE: graceful shutdown!");
+        std::process::exit(0);
+    }).unwrap();
 
     // PIPE
     //
