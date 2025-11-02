@@ -23,7 +23,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            pipe_name: String::from("\\\\.\\pipe\\DirMon"),
+            pipe_name: String::from("DirMon"),
             logfile: String::from(".\\dirmon.log"),
             nopipe: false,
             dirconfs: HashMap::new(),

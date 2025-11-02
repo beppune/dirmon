@@ -56,10 +56,10 @@ fn main() {
             continue;
         }
 
-        reactor.watch(key.to_path_buf(), |p|{
-            info!("{p}");
-            None
-        });
+        // reactor.watch(key.to_path_buf(), |p|{
+        //     info!("{p}");
+        //     REvent::write(p)
+        // });
 
     }
 
@@ -71,11 +71,7 @@ fn main() {
 
     {
         reactor.read(|buffer| {
-            let opt_ev:Option<REvent> = match command::parse_command(&buffer) {
-                Ok(event) => Some(event),
-                Err(_) => REvent::write(buffer),
-            };
-            opt_ev
+            REvent::write(buffer)
         });
     }
 

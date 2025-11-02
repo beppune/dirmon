@@ -47,9 +47,9 @@ impl Event {
         Some( Event::Write(buffer) )
     }
 
-    // pub fn watch(path:String) -> Option<Event> {
-    //     Some( Event::Dirmon(path) )
-    // }
+    pub fn watch(path:String) -> Option<Event> {
+        Some( Event::Dirmon(path) )
+    }
 }
 
 pub struct Reactor {
@@ -189,10 +189,9 @@ impl Reactor {
             },
             Event::Dirmon(path) => {
                 if let Some(Handler::OnDir(callback)) = &self.handlers.iter().find(|h| matches!(h, Handler::OnDir(_)) ) {
-                    let p = path.clone();
+                    info!("{path}");
                     let opt_ev = callback(path);
                     if let Some(ev) = opt_ev {
-                        self.queue.write().unwrap().push_back( Event::Write(p.clone()) );
                         self.queue.write().unwrap().push_back( ev );
                     }
                 }
