@@ -46,10 +46,6 @@ impl Event {
     pub fn write(buffer:String) -> Option<Event> {
         Some( Event::Write(buffer) )
     }
-
-    pub fn watch(path:String) -> Option<Event> {
-        Some( Event::Dirmon(path) )
-    }
 }
 
 pub struct Reactor {
@@ -79,15 +75,15 @@ impl Reactor {
                             notify::EventKind::Create(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    info!("CREATED {path}");
-                                    q.write().unwrap().push_back( Event::Dirmon(path) ); 
+                                    let s = format!("CREATED: {path}\r\n");
+                                    q.write().unwrap().push_back( Event::Dirmon(s) ); 
                                 }
                             },
                             notify::EventKind::Remove(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    info!("REMOVED: {path}");
-                                    q.write().unwrap().push_back( Event::Dirmon(path) ); 
+                                    let s = format!("REMOVED: {path}\r\n");
+                                    q.write().unwrap().push_back( Event::Dirmon(s) ); 
                                 }
                             },
                             _ => {},
@@ -189,7 +185,6 @@ impl Reactor {
             },
             Event::Dirmon(path) => {
                 if let Some(Handler::OnDir(callback)) = &self.handlers.iter().find(|h| matches!(h, Handler::OnDir(_)) ) {
-                    info!("{path}");
                     let opt_ev = callback(path);
                     if let Some(ev) = opt_ev {
                         self.queue.write().unwrap().push_back( ev );
@@ -203,22 +198,28 @@ impl Reactor {
         }
     }
 
-    pub fn accept<T>(&mut self, handler:T)
+    pub fn on_accept<T>(&mut self, handler:T)
         where T: Fn() -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnAccept(Box::new(handler)) );
     }
 
-    pub fn read<T>(&mut self, handler:T)
+    pub fn on_read<T>(&mut self, handler:T)
         where T: Fn(String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnRead(Box::new(handler)) );
     }
 
-    pub fn write<T>(&mut self, handler:T)
+    pub fn on_write<T>(&mut self, handler:T)
         where T: Fn(String) -> Option<Event> + 'static
     {
         self.handlers.push( Handler::OnWrite(Box::new(handler)) );
+    }
+
+    pub fn on_dir<T>(&mut self, handler:T)
+        where T: Fn(String) -> Option<Event> + 'static
+    {
+        self.handlers.push( Handler::OnDir(Box::new(handler)) );
     }
 
     pub fn watch(&mut self, path:PathBuf)

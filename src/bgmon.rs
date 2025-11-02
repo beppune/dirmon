@@ -61,19 +61,25 @@ fn main() {
     }
 
     {
-        reactor.accept(|| {
-            REvent::write(String::from("SERVICE: Ready\r\n"))
-        });
-    }
-
-    {
-        reactor.read(|buffer| {
+        reactor.on_dir(|buffer| {
             REvent::write(buffer)
         });
     }
 
     {
-        reactor.write(|buffer| {
+        reactor.on_accept(|| {
+            REvent::write(String::from("SERVICE: Ready\r\n"))
+        });
+    }
+
+    {
+        reactor.on_read(|buffer| {
+            REvent::write(buffer)
+        });
+    }
+
+    {
+        reactor.on_write(|buffer| {
             REvent::read(buffer)
         });
     }
