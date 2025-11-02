@@ -56,10 +56,7 @@ fn main() {
             continue;
         }
 
-        // reactor.watch(key.to_path_buf(), |p|{
-        //     info!("{p}");
-        //     REvent::write(p)
-        // });
+        reactor.watch(key.to_path_buf());
 
     }
 

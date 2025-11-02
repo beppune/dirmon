@@ -221,11 +221,9 @@ impl Reactor {
         self.handlers.push( Handler::OnWrite(Box::new(handler)) );
     }
 
-    pub fn watch<T>(&mut self, path:PathBuf, handler:T)
-        where T: Fn(String) -> Option<Event> + 'static
+    pub fn watch(&mut self, path:PathBuf)
     {
         self.watcher.watch(&path, notify::RecursiveMode::NonRecursive).unwrap();
-        self.handlers.push( Handler::OnDir(Box::new(handler)) );
     }
 }
 
