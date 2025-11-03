@@ -75,14 +75,14 @@ impl Reactor {
                             notify::EventKind::Create(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    let s = format!("CREATED: {path}\r\n");
+                                    let s = format!("CREATED: {path}");
                                     q.write().unwrap().push_back( Event::Dirmon(s) ); 
                                 }
                             },
                             notify::EventKind::Remove(_) => {
                                 let path = event.paths.get(0).unwrap().clone().into_os_string().into_string().unwrap();
                                 {
-                                    let s = format!("REMOVED: {path}\r\n");
+                                    let s = format!("REMOVED: {path}");
                                     q.write().unwrap().push_back( Event::Dirmon(s) ); 
                                 }
                             },
@@ -107,6 +107,9 @@ impl Reactor {
     }
 
     pub fn demux(&mut self) -> Option<Event> {
+        while self.queue.write().unwrap().len() == 0 {
+            std::thread::sleep(Duration::from_millis(100));
+        }
         self.queue.write().unwrap().pop_front()
     }
 
@@ -136,6 +139,9 @@ impl Reactor {
                 if let Some(Handler::OnRead(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnRead(_)) ) {
                     let ev:Option<Event>;
                     buffer.clear();
+                    if self.stream.get().is_none() {
+                        return;
+                    }
                     match self.stream.get_mut().unwrap().read_to_string(&mut buffer) {
                         Ok(amount) if amount == 0 => {
                             ev = Event::read(buffer);
@@ -159,6 +165,9 @@ impl Reactor {
             Event::Write(buffer) => {
                 if let Some(Handler::OnWrite(callback)) = &self.handlers.iter().find( |h| matches!(h, Handler::OnWrite(_)) ) {
                     let ev:Option<Event>;
+                    if self.stream.get().is_none() {
+                        return;
+                    }
                     match self.stream.get_mut().unwrap().write(buffer.as_bytes()) {
                         Ok(amount) if amount == 0 => {
                             ev = Event::write(buffer);
@@ -181,6 +190,7 @@ impl Reactor {
             },
             Event::Dirmon(path) => {
                 if let Some(Handler::OnDir(callback)) = &self.handlers.iter().find(|h| matches!(h, Handler::OnDir(_)) ) {
+                    info!("{path}");
                     let opt_ev = callback(path);
                     if let Some(ev) = opt_ev {
                         self.queue.write().unwrap().push_back( ev );
